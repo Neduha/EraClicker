@@ -6,8 +6,9 @@ import androidx.room.PrimaryKey
 @Entity(tableName = "player_state")
 data class PlayerState(
     @PrimaryKey val id: Int = 0,
-    val resources: Int,
+    val resources: Long,
     val clickPower: Int,
     val passiveIncome: Int,
-    val currentEra: Int
+    val currentEra: Int,
+    val lastUpdate: Long
 )

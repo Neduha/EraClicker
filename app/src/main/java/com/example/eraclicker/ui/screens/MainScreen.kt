@@ -47,15 +47,15 @@ fun MainScreen(
     }
 
     val clickRes = when (gameVm.currentEra) {
-        1 -> R.drawable.meat
-        2 -> R.drawable.meat
-        3 -> R.drawable.meat
-        4 -> R.drawable.meat
-        5 -> R.drawable.meat
-        6 -> R.drawable.meat
-        7 -> R.drawable.meat
-        8 -> R.drawable.meat
-        else -> R.drawable.meat
+        1 -> R.drawable.co_caveman
+        2 -> R.drawable.co_tribal
+        3 -> R.drawable.co_ancient
+        4 -> R.drawable.co_industrial
+        5 -> R.drawable.co_modern
+        6 -> R.drawable.co_postmodern
+        7 -> R.drawable.co_interstellar
+        8 -> R.drawable.co_ascended
+        else -> R.drawable.co_caveman
     }
 
     val clicks = remember { mutableStateListOf<ClickAnim>() }

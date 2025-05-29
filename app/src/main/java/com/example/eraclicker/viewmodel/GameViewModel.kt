@@ -14,11 +14,10 @@ import com.example.eraclicker.model.Upgrade
 import com.example.eraclicker.model.UpgradeType
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 
 class GameViewModel(app: Application) : AndroidViewModel(app) {
 
-    var resources by mutableStateOf(1000); private set
+    var resources by mutableStateOf(1000L); private set
     var clickPower by mutableStateOf(1); private set
     var passiveIncome by mutableStateOf(0); private set
     var currentEra by mutableStateOf(1); private set
@@ -118,25 +117,39 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
         Upgrade(64, "Thought Loop Farm",     90000,350,UpgradeType.PASSIVE,8, 0)
     )
 
-    private val db         = AppDatabase.getInstance(app)
-    private val playerDao  = db.playerStateDao()
+    private val db = AppDatabase.getInstance(app)
+    private val playerDao = db.playerStateDao()
     private val upgradeDao = db.upgradeStateDao()
 
     init {
-        viewModelScope.launch {
-            withContext(Dispatchers.IO) {
-                playerDao.get()?.also { ps ->
-                    resources     = ps.resources
-                    clickPower    = ps.clickPower
-                    passiveIncome = ps.passiveIncome
-                    currentEra    = ps.currentEra
-                }
-                val saved = upgradeDao.getAll().associateBy { it.id }
-                upgrades.replaceAll { up ->
-                    up.copy(level = saved[up.id]?.level ?: 0)
-                }
-            }
+        viewModelScope.launch(Dispatchers.IO) {
+            val ps = playerDao.get() ?: PlayerState(
+                resources = resources,
+                clickPower = clickPower,
+                passiveIncome = passiveIncome,
+                currentEra = currentEra,
+                lastUpdate = System.currentTimeMillis()
+            )
+            val now = System.currentTimeMillis()
+            val deltaSec = ((now - ps.lastUpdate) / 1000).toInt().coerceAtLeast(0)
+            val gained = deltaSec * ps.passiveIncome
+            resources = ps.resources + gained
+            clickPower = ps.clickPower
+            passiveIncome = ps.passiveIncome
+            currentEra = ps.currentEra
+            playerDao.upsert(
+                PlayerState(
+                    resources = resources,
+                    clickPower = clickPower,
+                    passiveIncome = passiveIncome,
+                    currentEra = currentEra,
+                    lastUpdate = now
+                )
+            )
+            val saved = upgradeDao.getAll().associateBy { it.id }
+            upgrades.replaceAll { up -> up.copy(level = saved[up.id]?.level ?: 0) }
         }
+
         viewModelScope.launch {
             while (true) {
                 kotlinx.coroutines.delay(1000L)
@@ -152,11 +165,11 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch(Dispatchers.IO) {
             playerDao.upsert(
                 PlayerState(
-                    id            = 0,
-                    resources     = resources,
-                    clickPower    = clickPower,
+                    resources = resources,
+                    clickPower = clickPower,
                     passiveIncome = passiveIncome,
-                    currentEra    = currentEra
+                    currentEra = currentEra,
+                    lastUpdate = System.currentTimeMillis()
                 )
             )
         }
@@ -176,23 +189,18 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
     fun buyUpgrade(id: Int) {
         val idx = upgrades.indexOfFirst { it.id == id && it.era <= currentEra }
         if (idx < 0) return
-
         val up = upgrades[idx]
         val cost = up.cost * (up.level + 1)
         if (resources < cost) return
-
         resources -= cost
         val newLevel = up.level + 1
         upgrades[idx] = up.copy(level = newLevel)
-
         when (up.type) {
             UpgradeType.CLICK   -> clickPower    += up.bonus
             UpgradeType.PASSIVE -> passiveIncome += up.bonus
             UpgradeType.ERA     -> currentEra     = (currentEra + 1).coerceAtMost(eraNames.size)
         }
-
         persistPlayer()
         persistUpgrade(up.copy(level = newLevel))
     }
-
 }

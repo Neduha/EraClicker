@@ -59,5 +59,7 @@ dependencies {
     debugImplementation(libs.androidx.ui.test.manifest)
     implementation(libs.room.runtime)
     implementation(libs.room.ktx)
+    implementation(libs.coroutines.android)
     kapt          (libs.room.compiler)
+
 }
