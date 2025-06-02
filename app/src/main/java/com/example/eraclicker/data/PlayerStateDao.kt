@@ -7,9 +7,16 @@ import androidx.room.Query
 
 @Dao
 interface PlayerStateDao {
-    @Query("SELECT * FROM player_state WHERE id = 0")
-    suspend fun get(): PlayerState?
+
+
+    @Query("SELECT * FROM player_state LIMIT 1")
+    suspend fun getPlayerState(): PlayerState?
+
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(state: PlayerState)
+
+    @Query("SELECT id FROM player_state LIMIT 1")
+    suspend fun getPlayerStateId(): Int?
+
 }

@@ -28,6 +28,7 @@ import com.example.eraclicker.ui.navigation.Screen
 import com.example.eraclicker.viewmodel.GameViewModel
 import kotlinx.coroutines.launch
 import kotlin.random.Random
+import com.example.eraclicker.util.NumberFormatter
 
 @Composable
 fun MainScreen(
@@ -106,7 +107,7 @@ fun MainScreen(
                             val alpha   = Animatable(1f)
                             val clickAnim = ClickAnim(
                                 id      = id,
-                                text    = "+$gain",
+                                text = "+${NumberFormatter.formatGeneric(gain.toLong())}",
                                 x       = xDp + Random.nextInt(-10,10).dp,
                                 y       = yDp + Random.nextInt(-10,10).dp,
                                 offsetY = offsetY,
@@ -133,7 +134,7 @@ fun MainScreen(
             Spacer(Modifier.height(24.dp))
 
             Text(
-                text  = "${gameVm.resources}",
+                text = NumberFormatter.format(gameVm.resources),
                 style = MaterialTheme.typography.headlineSmall,
                 color = Color.White
             )
@@ -141,7 +142,7 @@ fun MainScreen(
             Spacer(Modifier.height(8.dp))
 
             Text(
-                text  = "Passive: ${gameVm.passiveIncome}/s",
+                text = "Passive: ${NumberFormatter.format(gameVm.passiveIncome.toLong())}/s",
                 style = MaterialTheme.typography.bodyLarge,
                 color = Color.White
             )

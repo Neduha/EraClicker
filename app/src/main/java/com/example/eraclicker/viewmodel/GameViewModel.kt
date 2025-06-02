@@ -1,12 +1,16 @@
 package com.example.eraclicker.viewmodel
 
 import android.app.Application
+import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.lifecycle.DefaultLifecycleObserver
+import androidx.lifecycle.LifecycleOwner
+import androidx.lifecycle.ProcessLifecycleOwner
 import com.example.eraclicker.data.AppDatabase
 import com.example.eraclicker.data.PlayerState
 import com.example.eraclicker.data.UpgradeState
@@ -14,13 +18,22 @@ import com.example.eraclicker.model.Upgrade
 import com.example.eraclicker.model.UpgradeType
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.Job
+import kotlin.collections.plusAssign
+import kotlin.compareTo
+import kotlin.text.get
 
-class GameViewModel(app: Application) : AndroidViewModel(app) {
+class GameViewModel(app: Application) : AndroidViewModel(app),
+    DefaultLifecycleObserver {
 
     var resources by mutableStateOf(1000L); private set
     var clickPower by mutableStateOf(1); private set
     var passiveIncome by mutableStateOf(0); private set
     var currentEra by mutableStateOf(1); private set
+    var upgrades = mutableStateListOf<Upgrade>(); private set
+    var areUpgradesLoaded by mutableStateOf(false); private set
+    private var periodicPersistJob: Job? = null
 
     val eraNames = listOf(
         "Caveman Times",
@@ -33,9 +46,9 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
         "Ascended Realm"
     )
     val currentEraName: String
-        get() = eraNames[currentEra - 1]
+        get() = eraNames.getOrElse(currentEra - 1) { "Era ${currentEra}" }
 
-    var upgrades = mutableStateListOf(
+    private val baseUpgradesBlueprint: List<Upgrade> = listOf(
         // ERA 1 – Caveman
         Upgrade(1,  "Invent the Wheel",     100,   0, UpgradeType.ERA,     1, 0),
         Upgrade(2,  "Stone Tool",            10,   1, UpgradeType.CLICK,   1, 0),
@@ -122,53 +135,97 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
     private val upgradeDao = db.upgradeStateDao()
 
     init {
+        ProcessLifecycleOwner.get().lifecycle.addObserver(this)
+        loadGameData()
+    }
+
+    private fun loadGameData() {
         viewModelScope.launch(Dispatchers.IO) {
-            val ps = playerDao.get() ?: PlayerState(
-                resources = resources,
-                clickPower = clickPower,
-                passiveIncome = passiveIncome,
-                currentEra = currentEra,
+            val ps = playerDao.getPlayerState() ?: PlayerState(
+                resources = 1000L,
+                clickPower = 1,
+                passiveIncome = 0,
+                currentEra = 1,
                 lastUpdate = System.currentTimeMillis()
             )
+
             val now = System.currentTimeMillis()
             val deltaSec = ((now - ps.lastUpdate) / 1000).toInt().coerceAtLeast(0)
-            val gained = deltaSec * ps.passiveIncome
-            resources = ps.resources + gained
-            clickPower = ps.clickPower
-            passiveIncome = ps.passiveIncome
-            currentEra = ps.currentEra
+            val gainedSinceLastClose = deltaSec * ps.passiveIncome
+
+            val initialResources = ps.resources + gainedSinceLastClose
+            val initialClickPower = ps.clickPower
+            val initialPassiveIncome = ps.passiveIncome
+            val initialCurrentEra = ps.currentEra
+
+
             playerDao.upsert(
-                PlayerState(
-                    resources = resources,
-                    clickPower = clickPower,
-                    passiveIncome = passiveIncome,
-                    currentEra = currentEra,
+                ps.copy(
+                    resources = initialResources,
+                    clickPower = initialClickPower,
+                    passiveIncome = initialPassiveIncome,
+                    currentEra = initialCurrentEra,
                     lastUpdate = now
                 )
             )
-            val saved = upgradeDao.getAll().associateBy { it.id }
-            upgrades.replaceAll { up -> up.copy(level = saved[up.id]?.level ?: 0) }
-        }
 
-        viewModelScope.launch {
-            while (true) {
-                kotlinx.coroutines.delay(1000L)
-                if (passiveIncome > 0) {
-                    resources += passiveIncome
-                    persistPlayer()
-                }
+
+            withContext(Dispatchers.Main) {
+                resources = initialResources
+                clickPower = initialClickPower
+                passiveIncome = initialPassiveIncome
+                currentEra = initialCurrentEra
+            }
+
+
+            val savedUpgradeStates = upgradeDao.getAll().associateBy { it.id }
+            val loadedUpgradesList = baseUpgradesBlueprint.map { blueprintUpgrade ->
+                blueprintUpgrade.copy(level = savedUpgradeStates[blueprintUpgrade.id]?.level ?: 0)
+            }
+
+
+            withContext(Dispatchers.Main) {
+                upgrades.clear()
+                upgrades.addAll(loadedUpgradesList)
+                areUpgradesLoaded = true
             }
         }
+
+
+
     }
 
     private fun persistPlayer() {
         viewModelScope.launch(Dispatchers.IO) {
+        val existingPlayerId = playerDao.getPlayerStateId() ?: 0
+
+        playerDao.upsert(
+            PlayerState(
+                id = existingPlayerId,
+                resources = this@GameViewModel.resources,
+                clickPower = this@GameViewModel.clickPower,
+                passiveIncome = this@GameViewModel.passiveIncome,
+                currentEra = this@GameViewModel.currentEra,
+                lastUpdate = System.currentTimeMillis()
+            )
+        )
+    }
+    }
+
+    private fun persistCurrentResourcesOnly() {
+        viewModelScope.launch(Dispatchers.IO) {
+
+            val currentClickPower = this@GameViewModel.clickPower
+            val currentPassiveIncome = this@GameViewModel.passiveIncome
+            val currentEraVal = this@GameViewModel.currentEra
+
             playerDao.upsert(
                 PlayerState(
-                    resources = resources,
-                    clickPower = clickPower,
-                    passiveIncome = passiveIncome,
-                    currentEra = currentEra,
+                    id = playerDao.getPlayerStateId() ?: 0,
+                    resources = this@GameViewModel.resources,
+                    clickPower = currentClickPower,
+                    passiveIncome = currentPassiveIncome,
+                    currentEra = currentEraVal,
                     lastUpdate = System.currentTimeMillis()
                 )
             )
@@ -187,20 +244,95 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun buyUpgrade(id: Int) {
-        val idx = upgrades.indexOfFirst { it.id == id && it.era <= currentEra }
-        if (idx < 0) return
-        val up = upgrades[idx]
-        val cost = up.cost * (up.level + 1)
-        if (resources < cost) return
-        resources -= cost
-        val newLevel = up.level + 1
-        upgrades[idx] = up.copy(level = newLevel)
-        when (up.type) {
-            UpgradeType.CLICK   -> clickPower    += up.bonus
-            UpgradeType.PASSIVE -> passiveIncome += up.bonus
-            UpgradeType.ERA     -> currentEra     = (currentEra + 1).coerceAtMost(eraNames.size)
+        if (!areUpgradesLoaded) {
+            return
         }
+
+        val originalIndex = upgrades.indexOfFirst { it.id == id }
+        if (originalIndex == -1) {
+            return
+        }
+
+        val upgradeToBuy = upgrades[originalIndex]
+        if (upgradeToBuy.era > this.currentEra && upgradeToBuy.type != UpgradeType.ERA) {
+            return
+        }
+
+        if (upgradeToBuy.type == UpgradeType.ERA && upgradeToBuy.era != this.currentEra) {
+            return
+        }
+
+
+        val cost = upgradeToBuy.cost * (upgradeToBuy.level + 1)
+        if (resources < cost) {
+            return
+        }
+
+        resources -= cost
+
+        val newLevel = upgradeToBuy.level + 1
+        val updatedUpgrade = upgradeToBuy.copy(level = newLevel)
+
+        upgrades[originalIndex] = updatedUpgrade
+
+        when (updatedUpgrade.type) {
+            UpgradeType.CLICK   -> clickPower += updatedUpgrade.bonus
+            UpgradeType.PASSIVE -> passiveIncome += updatedUpgrade.bonus
+            UpgradeType.ERA     -> {
+
+                val maxEra = eraNames.size
+                currentEra = (this.currentEra + 1).coerceAtMost(maxEra)
+            }
+        }
+
         persistPlayer()
-        persistUpgrade(up.copy(level = newLevel))
+        persistUpgrade(updatedUpgrade)
+    }
+
+    override fun onStart(owner: LifecycleOwner) {
+        super.onStart(owner)
+
+        startPeriodicPersistence()
+    }
+
+    override fun onStop(owner: LifecycleOwner) {
+        super.onStop(owner)
+
+        stopPeriodicPersistence()
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        ProcessLifecycleOwner.get().lifecycle.removeObserver(this)
+        stopPeriodicPersistence()
+
+    }
+
+    private fun startPeriodicPersistence() {
+        if (periodicPersistJob?.isActive == true) {
+
+            return
+        }
+        periodicPersistJob = viewModelScope.launch {
+
+            while (true) {
+                kotlinx.coroutines.delay(1000L)
+                if (passiveIncome > 0) {
+                    val currentPassiveIncome = passiveIncome
+                    if (currentPassiveIncome > 0) {
+                        withContext(Dispatchers.Main) {
+                            resources += currentPassiveIncome
+                        }
+                        persistCurrentResourcesOnly()
+                    }
+                }
+            }
+        }
+    }
+
+    private fun stopPeriodicPersistence() {
+        periodicPersistJob?.cancel()
+        periodicPersistJob = null
+
     }
 }
