@@ -1,5 +1,6 @@
 package com.example.eraclicker.viewmodel
 
+
 import android.app.Application
 import android.util.Log
 import androidx.lifecycle.AndroidViewModel
@@ -20,9 +21,15 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.Job
+import kotlin.collections.addAll
 import kotlin.collections.plusAssign
 import kotlin.compareTo
+import kotlin.div
+import kotlin.rem
+import kotlin.text.clear
 import kotlin.text.get
+import kotlin.times
+
 
 class GameViewModel(app: Application) : AndroidViewModel(app),
     DefaultLifecycleObserver {
@@ -32,8 +39,13 @@ class GameViewModel(app: Application) : AndroidViewModel(app),
     var passiveIncome by mutableStateOf(0); private set
     var currentEra by mutableStateOf(1); private set
     var upgrades = mutableStateListOf<Upgrade>(); private set
+
+
     var areUpgradesLoaded by mutableStateOf(false); private set
     private var periodicPersistJob: Job? = null
+
+
+    private var initiateForceTimeTamperTest = false // True for lockout testing. False for normal gameplay.
 
     val eraNames = listOf(
         "Caveman Times",
@@ -134,66 +146,189 @@ class GameViewModel(app: Application) : AndroidViewModel(app),
     private val playerDao = db.playerStateDao()
     private val upgradeDao = db.upgradeStateDao()
 
+
+    var showWelcomeBackScreen by mutableStateOf(false); private set
+    var offlineTimeGainedString by mutableStateOf(""); private set
+    var offlineResourcesGained by mutableStateOf(0L); private set
+
+    var showTimeLockoutScreen by mutableStateOf(false); private set
+    var lockoutMessage by mutableStateOf(""); private set
+    var lockoutEndTimeMillis by mutableStateOf(0L); private set
+    var remainingLockoutTimeForDisplayMillis by mutableStateOf(0L); private set
+
+
     init {
         ProcessLifecycleOwner.get().lifecycle.addObserver(this)
         loadGameData()
     }
 
+
     private fun loadGameData() {
         viewModelScope.launch(Dispatchers.IO) {
-            val ps = playerDao.getPlayerState() ?: PlayerState(
-                resources = 1000L,
-                clickPower = 1,
-                passiveIncome = 0,
-                currentEra = 1,
+
+            val MAX_REASONABLE_OFFLINE_DAYS = 6.9
+            val MAX_REASONABLE_OFFLINE_MS = (MAX_REASONABLE_OFFLINE_DAYS * 24 * 60 * 60 * 1000L).toLong()
+
+            var ps = playerDao.getPlayerState() ?: PlayerState(
+                resources = 1000L, clickPower = 1, passiveIncome = 0, currentEra = 1,
                 lastUpdate = System.currentTimeMillis()
             )
-
             val now = System.currentTimeMillis()
-            val deltaSec = ((now - ps.lastUpdate) / 1000).toInt().coerceAtLeast(0)
-            val gainedSinceLastClose = deltaSec * ps.passiveIncome
 
-            val initialResources = ps.resources + gainedSinceLastClose
-            val initialClickPower = ps.clickPower
-            val initialPassiveIncome = ps.passiveIncome
-            val initialCurrentEra = ps.currentEra
+            var effectiveLastUpdateToUse = ps.lastUpdate
+            var isConsideredBackwardTampering = ps.lastUpdate > now
+
+            if (initiateForceTimeTamperTest) {
+                if (ps.lastUpdate <= now) {
+                    effectiveLastUpdateToUse = now + (60 * 1 * 1000L)
+                    isConsideredBackwardTampering = true
+                    withContext(Dispatchers.Main) {
+                        initiateForceTimeTamperTest = false
+                    }
+                } else {
+                    withContext(Dispatchers.Main) {
+
+                        initiateForceTimeTamperTest = false
+                    }
+                }
+            }
+
+            if (isConsideredBackwardTampering) {
+                val timeDifferenceObserved = effectiveLastUpdateToUse - now
+                if (timeDifferenceObserved > 0) {
+                    val lockoutDurationMillis = timeDifferenceObserved
+                    val calculatedLockoutEndTime = now + lockoutDurationMillis
+                    withContext(Dispatchers.Main) {
+                        this@GameViewModel.lockoutMessage = "Welcome back, Time Traveler!\nTo fix the spacetime continuum, you must wait for the paradox to resolve."
+                        this@GameViewModel.lockoutEndTimeMillis = calculatedLockoutEndTime
+                        this@GameViewModel.remainingLockoutTimeForDisplayMillis = lockoutDurationMillis
+                        this@GameViewModel.showTimeLockoutScreen = true
+                    }
+                    playerDao.upsert(ps.copy(lastUpdate = calculatedLockoutEndTime))
+                    startLockoutCountdownUpdater()
+                    return@launch
+                }
+            }
 
 
-            playerDao.upsert(
-                ps.copy(
-                    resources = initialResources,
-                    clickPower = initialClickPower,
-                    passiveIncome = initialPassiveIncome,
-                    currentEra = initialCurrentEra,
-                    lastUpdate = now
+            val offlineDurationMillis = now - ps.lastUpdate
+            var resourcesAfterCheck = ps.resources
+            var performNormalGainCalculation = true
+
+            if (offlineDurationMillis > MAX_REASONABLE_OFFLINE_MS) {
+
+                ps = ps.copy(resources = resourcesAfterCheck, lastUpdate = now)
+                playerDao.upsert(ps)
+                performNormalGainCalculation = false
+
+            }
+
+            var finalResources = resourcesAfterCheck
+            var finalClickPower = ps.clickPower
+            var finalPassiveIncome = ps.passiveIncome
+            var finalCurrentEra = ps.currentEra
+            var finalLastUpdate = ps.lastUpdate
+
+            var shouldShowWelcomeBack = false
+            var timeAwayStr = ""
+            var actualGainedForWelcomeScreen = 0L
+            val significantTimeThresholdSeconds = 10L
+
+            if (performNormalGainCalculation) {
+                val deltaSecTotal = (offlineDurationMillis / 1000L)
+                if (deltaSecTotal > 0 && ps.passiveIncome > 0) {
+                    val gainedSinceLastClose = deltaSecTotal * ps.passiveIncome
+                    finalResources += gainedSinceLastClose
+                    actualGainedForWelcomeScreen = gainedSinceLastClose
+
+                    if (deltaSecTotal > significantTimeThresholdSeconds) {
+                        val hours = deltaSecTotal / 3600
+                        val minutes = (deltaSecTotal % 3600) / 60
+                        val seconds = deltaSecTotal % 60
+                        timeAwayStr = buildString {
+                            if (hours > 0) append("${hours}h ")
+                            if (minutes > 0) append("${minutes}m ")
+                            append("${seconds}s")
+                        }.trim()
+                        if (timeAwayStr.isEmpty()) timeAwayStr = "0s"
+                        shouldShowWelcomeBack = true
+                    }
+                }
+                finalLastUpdate = now
+                playerDao.upsert(
+                    ps.copy(
+                        resources = finalResources,
+                        lastUpdate = finalLastUpdate
+                    )
                 )
-            )
+            }
 
 
             withContext(Dispatchers.Main) {
-                resources = initialResources
-                clickPower = initialClickPower
-                passiveIncome = initialPassiveIncome
-                currentEra = initialCurrentEra
-            }
+                this@GameViewModel.resources = finalResources
+                this@GameViewModel.clickPower = finalClickPower
+                this@GameViewModel.passiveIncome = finalPassiveIncome
+                this@GameViewModel.currentEra = finalCurrentEra
 
+                if (shouldShowWelcomeBack && performNormalGainCalculation) {
+                    this@GameViewModel.offlineTimeGainedString = timeAwayStr
+                    this@GameViewModel.offlineResourcesGained = actualGainedForWelcomeScreen
+                    this@GameViewModel.showWelcomeBackScreen = true
+                } else {
+                    this@GameViewModel.offlineTimeGainedString = ""
+                    this@GameViewModel.offlineResourcesGained = 0L
+                    this@GameViewModel.showWelcomeBackScreen = false
+                }
+            }
 
             val savedUpgradeStates = upgradeDao.getAll().associateBy { it.id }
             val loadedUpgradesList = baseUpgradesBlueprint.map { blueprintUpgrade ->
                 blueprintUpgrade.copy(level = savedUpgradeStates[blueprintUpgrade.id]?.level ?: 0)
             }
-
-
             withContext(Dispatchers.Main) {
                 upgrades.clear()
                 upgrades.addAll(loadedUpgradesList)
                 areUpgradesLoaded = true
             }
         }
-
-
-
     }
+
+
+    private var lockoutCountdownDisplayJob: Job? = null
+    private fun startLockoutCountdownUpdater() {
+        lockoutCountdownDisplayJob?.cancel()
+        lockoutCountdownDisplayJob = viewModelScope.launch {
+            while (this@GameViewModel.showTimeLockoutScreen && System.currentTimeMillis() < this@GameViewModel.lockoutEndTimeMillis) {
+                val currentSystemTime = System.currentTimeMillis()
+                val newRemaining = this@GameViewModel.lockoutEndTimeMillis - currentSystemTime
+
+                withContext(Dispatchers.Main) {
+                    this@GameViewModel.remainingLockoutTimeForDisplayMillis = if (newRemaining > 0) newRemaining else 0L
+                }
+
+
+                kotlinx.coroutines.delay(1000L)
+            }
+
+            if (this@GameViewModel.showTimeLockoutScreen && System.currentTimeMillis() >= this@GameViewModel.lockoutEndTimeMillis) {
+                withContext(Dispatchers.Main) {
+                    this@GameViewModel.showTimeLockoutScreen = false
+                    this@GameViewModel.lockoutMessage = ""
+                    this@GameViewModel.remainingLockoutTimeForDisplayMillis = 0L
+                }
+                loadGameData()
+            }
+
+        }
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        ProcessLifecycleOwner.get().lifecycle.removeObserver(this)
+        stopPeriodicPersistence()
+        lockoutCountdownDisplayJob?.cancel()
+    }
+
 
     private fun persistPlayer() {
         viewModelScope.launch(Dispatchers.IO) {
@@ -301,12 +436,7 @@ class GameViewModel(app: Application) : AndroidViewModel(app),
         stopPeriodicPersistence()
     }
 
-    override fun onCleared() {
-        super.onCleared()
-        ProcessLifecycleOwner.get().lifecycle.removeObserver(this)
-        stopPeriodicPersistence()
 
-    }
 
     private fun startPeriodicPersistence() {
         if (periodicPersistJob?.isActive == true) {
@@ -335,4 +465,14 @@ class GameViewModel(app: Application) : AndroidViewModel(app),
         periodicPersistJob = null
 
     }
+
+    fun clearWelcomeBackScreenFlag() {
+        viewModelScope.launch(Dispatchers.Main) {
+            showWelcomeBackScreen = false
+            offlineTimeGainedString = ""
+            offlineResourcesGained = 0L
+            Log.d("GameViewModel", "WelcomeBackScreen flag cleared.")
+        }
+    }
+
 }

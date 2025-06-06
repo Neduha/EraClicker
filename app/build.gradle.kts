@@ -62,6 +62,7 @@ dependencies {
     implementation(libs.coroutines.android)
     implementation(libs.androidx.work.runtime.ktx)
     implementation(libs.androidx.lifecycle.process)
+    implementation(libs.androidx.lifecycle.runtimeCompose)
     kapt          (libs.room.compiler)
 
 }

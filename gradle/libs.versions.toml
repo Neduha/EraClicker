@@ -11,6 +11,7 @@ composeBom = "2024.09.00"
 room = "2.6.1"
 kotlinx-coroutines-android = "1.8.1"
 work = "2.9.0"
+lifecycle = "2.8.0"
 kapt   = "2.0.21"
 
 [libraries]
@@ -35,7 +36,7 @@ room-compiler = { module = "androidx.room:room-compiler", version.ref = "room" }
 coroutines-android = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-android", version.ref = "kotlinx-coroutines-android" }
 androidx-work-runtime-ktx = { group = "androidx.work", name = "work-runtime-ktx", version.ref = "work" }
 androidx-lifecycle-process = { group = "androidx.lifecycle", name = "lifecycle-process", version.ref = "lifecycleRuntimeKtx" }
-
+androidx-lifecycle-runtimeCompose = { group = "androidx.lifecycle", name = "lifecycle-runtime-compose", version.ref = "lifecycle" }
 [plugins]
 
 kotlin-kapt = { id = "org.jetbrains.kotlin.kapt", version.ref = "kotlin" }
