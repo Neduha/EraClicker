@@ -23,7 +23,6 @@ class PassiveNotificationWorker(
     private val db = AppDatabase.getInstance(appContext)
     private val playerDao = db.playerStateDao()
 
-
     override suspend fun doWork(): Result = withContext(Dispatchers.IO) {
 
 
@@ -36,21 +35,14 @@ class PassiveNotificationWorker(
 
         val now = System.currentTimeMillis()
         val deltaSec = ((now - ps.lastUpdate) / 1000).toInt().coerceAtLeast(0)
-
-
-
-
         val earned = deltaSec.toLong() * ps.passiveIncome
-
 
         val updatedPlayerState = ps.copy(
             resources = ps.resources + earned,
             lastUpdate = now
         )
         playerDao.upsert(updatedPlayerState)
-
         showNotification(deltaSec, earned)
-
         return@withContext Result.success()
     }
 
@@ -59,10 +51,8 @@ class PassiveNotificationWorker(
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             val permissionStatus = ContextCompat.checkSelfPermission(appContext, Manifest.permission.POST_NOTIFICATIONS)
             if (permissionStatus != PackageManager.PERMISSION_GRANTED) {
-
                 return
             }
-
         }
 
         val hours = deltaSec / 3600

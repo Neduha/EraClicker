@@ -1,10 +1,32 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="purple_200">#FFBB86FC</color>
-    <color name="purple_500">#FF6200EE</color>
-    <color name="purple_700">#FF3700B3</color>
-    <color name="teal_200">#FF03DAC5</color>
-    <color name="teal_700">#FF018786</color>
-    <color name="black">#FF000000</color>
-    <color name="white">#FFFFFFFF</color>
+
+    <color name="purple_80">#FFD0BCFF</color>
+    <color name="purple_grey_80">#FFCCC2DC</color>
+    <color name="pink_80">#FFEFB8C8</color>
+
+    <color name="purple_40">#FF6650a4</color>
+    <color name="purple_grey_40">#FF625b71</color>
+    <color name="pink_40">#FF7D5260</color>
+
+
+    <color name="black_custom">#FF000000</color>
+    <color name="white_custom">#FFFFFFFF</color>
+    <color name="dark_background">#FF121212</color>
+    <color name="dark_surface">#FF1C1B1F</color>
+    <color name="light_background">#FFFFFBFE</color>
+    <color name="light_surface">#FFFFFBFE</color>
+    <color name="on_light_background_surface">#FF1C1B1F</color>
+
+
+    <color name="era_accent_caveman">#FF8D6E63</color>
+    <color name="era_accent_tribal">#FF8D491D</color>
+    <color name="era_accent_ancient">#FF9D983A</color>
+    <color name="era_accent_industrial">#FF596D77</color>
+    <color name="era_accent_digital">#FF136593</color>
+    <color name="era_accent_post_digital">#FF6134AF</color>
+    <color name="era_accent_interstellar">#FF5C298D</color>
+    <color name="era_accent_ascended">#FF045377</color>
+    <color name="default_era_accent">#FF757575</color>
+    <color name="paradox_accent_color">#FFE91E63</color>
 </resources>

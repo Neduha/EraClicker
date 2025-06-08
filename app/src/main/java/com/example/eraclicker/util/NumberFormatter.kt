@@ -35,11 +35,11 @@ object NumberFormatter {
         val valueT  = 1_000_000_000_000L          // 10^12
         val valueQ  = 1_000_000_000_000_000L      // 10^15
         val valueQi = 1_000_000_000_000_000_000L  // 10^18
-        val valueSx = 1.0E21 // Sextillion (10^21)
-        val valueSp = 1.0E24 // Septillion (10^24)
-        val valueOc = 1.0E27 // Octillion  (10^27)
-        val valueNo = 1.0E30 // Nonillion  (10^30)
-        val valueDc = 1.0E33 // Decillion  (10^33)
+        val valueSx = 1.0E21                      // (10^21)
+        val valueSp = 1.0E24                      // (10^24)
+        val valueOc = 1.0E27                      // (10^27)
+        val valueNo = 1.0E30                      // (10^30)
+        val valueDc = 1.0E33                      // (10^33)
 
         val numberAsDouble = number.toDouble()
 

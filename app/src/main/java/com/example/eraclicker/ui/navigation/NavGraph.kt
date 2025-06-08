@@ -1,7 +1,6 @@
 package com.example.eraclicker.ui.navigation
 
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue // Keep this
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
@@ -46,11 +45,15 @@ fun AppNavGraph(navController: NavHostController) {
                 gameVm = gameVm
             )
         }
-        composable(Screen.Stats.route) {
-            StatsScreen(gameVm = gameVm)
+       composable(Screen.Stats.route) {
+            StatsScreen(
+                navController = navController,
+                gameVm = gameVm
+            )
         }
         composable(Screen.WelcomeBack.route) {
             WelcomeBackScreen(
+                gameVm = gameVm,
                 timeAway = gameVm.offlineTimeGainedString,
                 resourcesEarned = gameVm.offlineResourcesGained,
                 onCollectClicked = {
@@ -65,7 +68,7 @@ fun AppNavGraph(navController: NavHostController) {
         composable(Screen.TimeLockout.route) {
             TimeTravelerLockoutScreen(
                 lockoutMessage = gameVm.lockoutMessage,
-                remainingMillis = gameVm.remainingLockoutTimeForDisplayMillis
+                remainingMillis = gameVm.remainingLockoutTimeForDisplayMillis,
             )
         }
     }

@@ -14,7 +14,7 @@ import com.example.eraclicker.data.PassiveNotificationWorker
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import java.util.concurrent.TimeUnit
-import kotlin.text.get
+
 
 class EraClickerApp : Application(), DefaultLifecycleObserver {
 
@@ -39,14 +39,11 @@ class EraClickerApp : Application(), DefaultLifecycleObserver {
             if (currentPlayerState == null) {
                 Log.w("EraClickerApp", "onStop: currentPlayerState is NULL. Cannot update lastUpdate.")
             } else {
-
                 playerDao.upsert(currentPlayerState.copy(lastUpdate = currentTimeForOnStop))
-
             }
 
-
             val req = OneTimeWorkRequestBuilder<PassiveNotificationWorker>()
-                .setInitialDelay(24, TimeUnit.HOURS)
+                .setInitialDelay(30, TimeUnit.SECONDS)
                 .build()
 
             WorkManager.getInstance(this@EraClickerApp)

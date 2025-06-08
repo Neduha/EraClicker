@@ -7,6 +7,7 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
@@ -29,53 +30,54 @@ import com.example.eraclicker.viewmodel.GameViewModel
 import kotlinx.coroutines.launch
 import kotlin.random.Random
 import com.example.eraclicker.util.NumberFormatter
+import com.example.eraclicker.ui.theme.getAccentColorForEra
 
 @Composable
 fun MainScreen(
     navController: NavHostController,
-    gameVm:         GameViewModel
+    gameVm: GameViewModel
 ) {
     val bgRes = when (gameVm.currentEra) {
-        1 -> R.drawable.bg_caveman
-        2 -> R.drawable.bg_tribal
-        3 -> R.drawable.bg_ancient
-        4 -> R.drawable.bg_industrial
-        5 -> R.drawable.bg_modern
-        6 -> R.drawable.bg_postmodern
-        7 -> R.drawable.bg_interstellar
-        8 -> R.drawable.bg_ascended
+        0 -> R.drawable.bg_caveman
+        1 -> R.drawable.bg_tribal
+        2 -> R.drawable.bg_ancient
+        3 -> R.drawable.bg_industrial
+        4 -> R.drawable.bg_modern
+        5 -> R.drawable.bg_postmodern
+        6 -> R.drawable.bg_interstellar
+        7 -> R.drawable.bg_ascended
         else -> R.drawable.bg_caveman
     }
 
     val clickRes = when (gameVm.currentEra) {
-        1 -> R.drawable.co_caveman
-        2 -> R.drawable.co_tribal
-        3 -> R.drawable.co_ancient
-        4 -> R.drawable.co_industrial
-        5 -> R.drawable.co_modern
-        6 -> R.drawable.co_postmodern
-        7 -> R.drawable.co_interstellar
-        8 -> R.drawable.co_ascended
+        0 -> R.drawable.co_caveman
+        1 -> R.drawable.co_tribal
+        2 -> R.drawable.co_ancient
+        3 -> R.drawable.co_industrial
+        4 -> R.drawable.co_modern
+        5 -> R.drawable.co_postmodern
+        6 -> R.drawable.co_interstellar
+        7 -> R.drawable.co_ascended
         else -> R.drawable.co_caveman
     }
 
     val clicks = remember { mutableStateListOf<ClickAnim>() }
-    val scope  = rememberCoroutineScope()
+    val scope = rememberCoroutineScope()
     val density = LocalDensity.current
+    val eraAccentColor = getAccentColorForEra(gameVm.currentEra)
 
     Box(modifier = Modifier.fillMaxSize()) {
         Image(
-            painter            = painterResource(id = bgRes),
+            painter = painterResource(id = bgRes),
             contentDescription = null,
-            modifier           = Modifier.fillMaxSize(),
-            contentScale       = ContentScale.Crop
+            modifier = Modifier.fillMaxSize(),
+            contentScale = ContentScale.Crop
         )
-
 
         clicks.forEach { anim ->
             Text(
-                text     = anim.text,
-                color    = Color.White,
+                text = anim.text,
+                color = Color.White,
                 modifier = Modifier
                     .align(Alignment.Center)
                     .offset(x = anim.x, y = anim.y + anim.offsetY.value.dp)
@@ -84,7 +86,7 @@ fun MainScreen(
         }
 
         Column(
-            modifier            = Modifier
+            modifier = Modifier
                 .fillMaxSize()
                 .padding(16.dp),
             verticalArrangement = Arrangement.Center,
@@ -104,30 +106,30 @@ fun MainScreen(
 
                             val id = System.currentTimeMillis()
                             val offsetY = Animatable(0f)
-                            val alpha   = Animatable(1f)
+                            val alpha = Animatable(1f)
                             val clickAnim = ClickAnim(
-                                id      = id,
-                                text = "+${NumberFormatter.formatGeneric(gain.toLong())}",
-                                x       = xDp + Random.nextInt(-10,10).dp,
-                                y       = yDp + Random.nextInt(-10,10).dp,
+                                id = id,
+                                text = "+${NumberFormatter.formatGeneric(gain)}",
+                                x = xDp + Random.nextInt(-20, 20).dp,
+                                y = yDp + Random.nextInt(-20, 20).dp,
                                 offsetY = offsetY,
-                                alpha   = alpha
+                                alpha = alpha
                             )
                             clicks += clickAnim
 
-                            scope.launch { offsetY.animateTo(-40f, tween(800)) }
+                            scope.launch { offsetY.animateTo(-50f, tween(1000)) }
                             scope.launch {
-                                alpha.animateTo(0f, tween(800))
+                                alpha.animateTo(0f, tween(1000))
                                 clicks.remove(clickAnim)
                             }
                         }
                     }
             ) {
                 Image(
-                    painter            = painterResource(id = clickRes),
+                    painter = painterResource(id = clickRes),
                     contentDescription = "Click target",
-                    modifier           = Modifier.fillMaxSize(),
-                    contentScale       = ContentScale.Fit
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Fit
                 )
             }
 
@@ -142,19 +144,37 @@ fun MainScreen(
             Spacer(Modifier.height(8.dp))
 
             Text(
-                text = "Passive: ${NumberFormatter.format(gameVm.passiveIncome.toLong())}/s",
+                text = "Passive: ${NumberFormatter.format(gameVm.passiveIncome)}/s",
                 style = MaterialTheme.typography.bodyLarge,
                 color = Color.White
             )
 
             Spacer(Modifier.height(24.dp))
 
-            Row {
-                Button(onClick = { navController.navigate(Screen.Upgrades.route) }) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                Button(
+                    onClick = { navController.navigate(Screen.Upgrades.route) },
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = eraAccentColor,
+                        contentColor = MaterialTheme.colorScheme.onPrimary
+                    ),
+                    modifier = Modifier.weight(1f)
+                ) {
                     Text("Upgrades")
                 }
-                Spacer(Modifier.width(16.dp))
-                Button(onClick = { navController.navigate(Screen.Stats.route) }) {
+
+                Button(
+                    onClick = { navController.navigate(Screen.Stats.route) },
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = eraAccentColor,
+                        contentColor = MaterialTheme.colorScheme.onPrimary
+                    ),
+                    modifier = Modifier.weight(1f)
+                ) {
                     Text("Stats")
                 }
             }
@@ -163,10 +183,10 @@ fun MainScreen(
 }
 
 private data class ClickAnim(
-    val id:      Long,
-    val text:    String,
-    val x:       Dp,
-    val y:       Dp,
+    val id: Long,
+    val text: String,
+    val x: Dp,
+    val y: Dp,
     val offsetY: Animatable<Float, *>,
-    val alpha:   Animatable<Float, *>
+    val alpha: Animatable<Float, *>
 )
